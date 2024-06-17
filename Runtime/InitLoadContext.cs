@@ -6,11 +6,15 @@ namespace SaveSystem
     public sealed class InitLoadContext<T> : IInitLoadContext<T> where T : class, ISavedData, new()
     {
         private readonly ReactiveCommand<ISavedData> _saveData = new ReactiveCommand<ISavedData>();
+
         private ReactiveProperty<ISavedData> _loadingData;
+        public ReadOnlyReactiveProperty<ISavedData> LoadingData => _loadingData;
+
         Type IInitLoadContext<T>.ContextType => typeof(T);
         ReactiveCommand<ISavedData> IInitLoadContext<T>.SaveData => _saveData;
         T IInitLoadContext<T>.Default => new T();
-        public ReadOnlyReactiveProperty<ISavedData> LoadingData => _loadingData;
+
+
         void IInitLoadContext<T>.Init(ReadOnlyReactiveProperty<ISavedData> data)
         {
             _loadingData = (ReactiveProperty<ISavedData>)data;

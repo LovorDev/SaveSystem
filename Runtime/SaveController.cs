@@ -6,12 +6,12 @@ using R3;
 
 namespace SaveSystem
 {
-    public class SaveController
+    public class SaveController : IDisposable
     {
         private readonly IEnumerable<ISaveProvider> _saveProviders;
         private readonly IEnumerable<IInitLoadContext<ISavedData>> _saveSystems;
 
-        private Dictionary<Type, string> _savingKeys;
+        private readonly IDisposable _saveSubscription;
 
         public SaveController(IEnumerable<IInitLoadContext<ISavedData>> saveSystems, IEnumerable<ISaveProvider> saveProviders)
         {
@@ -23,14 +23,12 @@ namespace SaveSystem
             foreach (var saveSystem in _saveSystems)
             {
                 saveSystem.Init(new ReactiveProperty<ISavedData>(saveSystem.Default, equalityCompareProvider));
-                saveSystem.SaveData.Subscribe(SaveData);
+                _saveSubscription = saveSystem.SaveData.Subscribe(SaveData);
             }
         }
 
         public void Initialize()
         {
-            _savingKeys = _saveSystems.ToDictionary(key => key.ContextType,
-                value => value.LoadingData.GetType().GetGenericArguments().First().FullName);
             LoadData();
         }
         private void LoadData()
@@ -39,7 +37,7 @@ namespace SaveSystem
             {
                 foreach (var saveSystem in _saveSystems)
                 {
-                    provider.Load(_savingKeys[saveSystem.ContextType], saveSystem.Default).ContinueWith(data => OnDataLoaded(saveSystem, data));
+                    provider.Load(saveSystem.ContextType.ToString(), saveSystem.Default).ContinueWith(data => OnDataLoaded(saveSystem, data));
                 }
             }
         }
@@ -47,13 +45,17 @@ namespace SaveSystem
         {
             foreach (var provider in _saveProviders)
             {
-                provider.TrySave(_savingKeys[obj.GetType()], obj).Forget();
+                provider.TrySave(obj.GetType().ToString(), obj).Forget();
             }
         }
 
         private void OnDataLoaded(IInitLoadContext<ISavedData> loadContext, ISavedData newData)
         {
             ((ReactiveProperty<ISavedData>)loadContext.LoadingData).Value = newData;
+        }
+        public void Dispose()
+        {
+            _saveSubscription?.Dispose();
         }
     }
 }
